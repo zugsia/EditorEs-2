@@ -1,5 +1,6 @@
 package com.termux.shared.activities;
 
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -204,6 +205,7 @@ public class ReportActivity extends BaseIDEActivity {
   }
 
   @Override
+  @SuppressLint("MissingSuperCall") // back intentionally removes the task instead of navigating
   public void onBackPressed() {
     // Remove activity from recents menu on back button press
     finishAndRemoveTask();

@@ -33,6 +33,7 @@ import org.greenrobot.eventbus.ThreadMode
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
+import java.util.stream.Collectors
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
 
@@ -86,19 +87,19 @@ class ProjectManagerImpl : IProjectManager, EventReceiver {
     rescanWorkspace()
   }
 
-  @Suppress("unused")
+  @Suppress("unused", "UNUSED_PARAMETER")
   @Subscribe(threadMode = ThreadMode.BACKGROUND)
   fun onFileCreated(event: FileCreationEvent) {
     rescanWorkspace()
   }
 
-  @Suppress("unused")
+  @Suppress("unused", "UNUSED_PARAMETER")
   @Subscribe(threadMode = ThreadMode.BACKGROUND)
   fun onFileDeleted(event: FileDeletionEvent) {
     rescanWorkspace()
   }
 
-  @Suppress("unused")
+  @Suppress("unused", "UNUSED_PARAMETER")
   @Subscribe(threadMode = ThreadMode.BACKGROUND)
   fun onFileRenamed(event: FileRenameEvent) {
     rescanWorkspace()
@@ -120,7 +121,7 @@ class ProjectManagerImpl : IProjectManager, EventReceiver {
           .filter { it.absolutePath.startsWith(dir.canonicalPath) }
           .distinct()
           .limit(MAX_MODULES.toLong())
-          .toList()
+          .collect(Collectors.toList())
       }
     }.getOrDefault(emptyList())
 

@@ -14,7 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.Window
-import android.view.WindowManager
+import android.view.WindowInsets
 import com.itsaky.androidide.flashbar.util.NavigationBarPosition.BOTTOM
 import com.itsaky.androidide.flashbar.util.NavigationBarPosition.LEFT
 import com.itsaky.androidide.flashbar.util.NavigationBarPosition.RIGHT
@@ -52,6 +52,17 @@ internal fun Activity.getNavigationBarPosition(): NavigationBarPosition {
 }
 
 internal fun Activity.getNavigationBarSizeInPx(): Int {
+  if (Build.VERSION.SDK_INT >= 30) {
+    val insets = windowManager.currentWindowMetrics.windowInsets
+      .getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
+    return when (getNavigationBarPosition()) {
+      LEFT -> insets.left
+      RIGHT -> insets.right
+      TOP -> insets.top
+      BOTTOM -> insets.bottom
+    }
+  }
+
   val realScreenSize = getRealScreenSize()
   val appUsableScreenSize = getAppUsableScreenSize()
   val navigationBarPosition = getNavigationBarPosition()
@@ -78,25 +89,18 @@ internal fun Context.convertPxToDp(px: Int): Int {
   return (px / (resources.displayMetrics.xdpi / DisplayMetrics.DENSITY_DEFAULT)).roundToInt()
 }
 
+// Pre-API 30 only; API 30+ uses WindowMetrics in getNavigationBarSizeInPx()
+@Suppress("DEPRECATION")
 private fun Activity.getRealScreenSize(): Point {
-  val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-  val defaultDisplay =
-    if (Build.VERSION.SDK_INT >= 30) {
-      display
-    } else {
-      @Suppress("DEPRECATION") windowManager.defaultDisplay
-    }
-
   val size = Point()
-  defaultDisplay?.getRealSize(size)
+  windowManager.defaultDisplay.getRealSize(size)
   return size
 }
 
+@Suppress("DEPRECATION")
 private fun Activity.getAppUsableScreenSize(): Point {
-  val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-  val defaultDisplay = windowManager.defaultDisplay
   val size = Point()
-  defaultDisplay.getSize(size)
+  windowManager.defaultDisplay.getSize(size)
   return size
 }
 

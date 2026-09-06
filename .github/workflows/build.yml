@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
     paths-ignore:
       - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
   workflow_dispatch: { }
 
 env:
@@ -15,7 +18,8 @@ jobs:
   build_apk:
     strategy:
       matrix:
-        build_type: ['release']
+        # pull requests cannot read the signing secrets, so they build an unsigned debug APK
+        build_type: ${{ fromJSON(github.event_name == 'pull_request' && '["debug"]' || '["release"]') }}
     name: Build APK
     runs-on: ubuntu-latest
     steps:
@@ -44,6 +48,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Restore release keystore
+        if: ${{ matrix.build_type == 'release' }}
         run: |
           mkdir -p config
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > config/release.keystore
@@ -69,11 +74,6 @@ jobs:
         with:
           name: apk-armeabi-v7a-${{ matrix.build_type }}
           path: app-armeabi-v7a-${{ matrix.build_type }}.apk
-      - name: Upload x86_64 ${{ matrix.build_type }} APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk-x86_64-${{ matrix.build_type }}
-          path: app-x86_64-${{ matrix.build_type }}.apk
       - name: Upload ${{ matrix.build_type }} mappings
         if: ${{ always() && matrix.build_type == 'release' }}
         uses: actions/upload-artifact@v4

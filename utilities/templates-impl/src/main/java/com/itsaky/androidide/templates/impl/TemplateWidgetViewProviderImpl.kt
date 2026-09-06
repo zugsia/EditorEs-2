@@ -146,6 +146,7 @@ class TemplateWidgetViewProviderImpl : ITemplateWidgetViewProvider {
 
   private fun createSpinner(context: Context, widget: SpinnerWidget<*>): View {
     return LayoutSpinnerBinding.inflate(LayoutInflater.from(context)).apply {
+      @Suppress("UNCHECKED_CAST")
       val param = widget.parameter as EnumParameter<Enum<*>>
 
       val nameToEnum = mutableMapOf<String, Enum<*>>()

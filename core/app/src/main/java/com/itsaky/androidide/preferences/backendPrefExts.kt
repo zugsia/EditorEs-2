@@ -38,6 +38,7 @@ import com.itsaky.androidide.utils.flashError
 import com.itsaky.androidide.utils.flashInfo
 import com.itsaky.androidide.utils.flashSuccess
 import kotlinx.coroutines.runBlocking
+import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
@@ -272,6 +273,7 @@ private class BuildApiPreference(
   override val title: Int = string.idepref_backend_api,
 ) : SingleChoicePreference() {
 
+  @IgnoredOnParcel
   private val levels = intArrayOf(24, 26, 28, 29, 30, 33, 34)
 
   override fun getEntries(preference: Preference): Array<PreferenceChoices.Entry> {
@@ -306,6 +308,7 @@ private class BuildTypePreference(
   override val title: Int = string.idepref_backend_buildtype,
 ) : SingleChoicePreference() {
 
+  @IgnoredOnParcel
   private val types = intArrayOf(
     BackendPreferences.BUILD_TYPE_RELEASE,
     BackendPreferences.BUILD_TYPE_DEBUG,

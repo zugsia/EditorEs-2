@@ -75,6 +75,7 @@ import org.eclipse.lsp4j.TextDocumentContentChangeEvent
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextDocumentItem
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
+import org.eclipse.lsp4j.WorkspaceFolder
 import org.eclipse.lsp4j.launch.LSPLauncher
 import org.eclipse.lsp4j.services.LanguageServer
 import org.greenrobot.eventbus.EventBus
@@ -393,7 +394,10 @@ class CppLanguageServer(
         launcher.startListening()
         val remote = launcher.remoteProxy
         val init = InitializeParams()
-        init.rootUri = projectRoot.toURI().toString()
+        val rootUri = projectRoot.toURI().toString()
+        init.workspaceFolders = listOf(WorkspaceFolder(rootUri, projectRoot.name))
+        @Suppress("DEPRECATION") // clangd still reads rootUri when workspaceFolders is present
+        init.rootUri = rootUri
         init.processId = null
         init.initializationOptions = mapOf(
           "fallbackFlags" to fallbackFlags(),

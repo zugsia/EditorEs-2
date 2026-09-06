@@ -233,6 +233,7 @@ public class TextIOActivity extends AppCompatActivity {
     }
 
     @Override
+    @SuppressLint("MissingSuperCall") // back confirms and finishes via confirm()
     public void onBackPressed() {
         confirm();
     }

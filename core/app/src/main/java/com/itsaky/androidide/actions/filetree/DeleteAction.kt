@@ -17,7 +17,6 @@
 
 package com.itsaky.androidide.actions.filetree
 
-import android.app.ProgressDialog
 import android.content.Context
 import com.blankj.utilcode.util.FileUtils
 import com.itsaky.androidide.actions.ActionData
@@ -53,7 +52,8 @@ class DeleteAction(context: Context, override val order: Int) :
         dialogInterface.dismiss()
         @Suppress("DEPRECATION")
         val progressDialog =
-          ProgressDialog.show(context, null, context.getString(R.string.please_wait), true, false)
+          android.app.ProgressDialog.show(context, null, context.getString(R.string.please_wait),
+            true, false)
         executeAsync({ FileUtils.delete(file) }) {
           progressDialog.dismiss()
 

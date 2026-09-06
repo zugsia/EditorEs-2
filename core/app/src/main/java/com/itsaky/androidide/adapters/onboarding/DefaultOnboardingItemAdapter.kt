@@ -62,7 +62,7 @@ open class DefaultOnboardingItemAdapter<T : OnboardingItem>(
     if (item.icon != 0) {
       binding.content.icon.setImageResource(item.icon)
       if (item.iconTint != 0) {
-        binding.content.icon.supportImageTintList = ColorStateList.valueOf(item.iconTint)
+        binding.content.icon.imageTintList = ColorStateList.valueOf(item.iconTint)
       }
     } else {
       binding.content.icon.visibility = View.INVISIBLE

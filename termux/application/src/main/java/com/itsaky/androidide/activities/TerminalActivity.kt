@@ -66,9 +66,9 @@ class TerminalActivity : TermuxActivity() {
     return IdeTerminalSessionClient(this)
   }
 
-  override fun onSaveInstanceState(savedInstanceState: Bundle) {
-    super.onSaveInstanceState(savedInstanceState)
-    savedInstanceState.putBoolean(KEY_TERMINAL_CAN_ADD_SESSIONS, canAddNewSessions)
+  override fun onSaveInstanceState(outState: Bundle) {
+    super.onSaveInstanceState(outState)
+    outState.putBoolean(KEY_TERMINAL_CAN_ADD_SESSIONS, canAddNewSessions)
   }
 
   override fun onServiceConnected(componentName: ComponentName?, service: IBinder?) {

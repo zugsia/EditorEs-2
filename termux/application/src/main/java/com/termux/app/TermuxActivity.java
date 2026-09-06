@@ -636,7 +636,7 @@ public class TermuxActivity extends BaseIDEActivity implements ServiceConnection
 
 
 
-    @SuppressLint("RtlHardcoded")
+    @SuppressLint({"RtlHardcoded", "MissingSuperCall"})
     @Override
     public void onBackPressed() {
         if (getDrawer().isDrawerOpen(Gravity.LEFT)) {

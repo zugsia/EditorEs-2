@@ -58,7 +58,7 @@ class NewFileAction(context: Context, override val order: Int) :
     val file = data.requireFile()
     val node = data.getTreeNode()
     try {
-      createNewFile(context, node, file, false)
+      createNewFile(context, node, file)
     } catch (e: Exception) {
       log.error("Failed to create new file", e)
       flashError(e.cause?.message ?: e.message)
@@ -68,8 +68,7 @@ class NewFileAction(context: Context, override val order: Int) :
   private fun createNewFile(
     context: Context,
     node: TreeNode?,
-    file: File,
-    forceUnknownType: Boolean
+    file: File
   ) {
     createNewEmptyFile(context, node, file)
   }

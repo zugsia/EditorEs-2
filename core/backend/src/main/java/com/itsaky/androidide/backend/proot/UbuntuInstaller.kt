@@ -58,7 +58,7 @@ class UbuntuInstaller(private val context: Context) {
         val tarball = ProotConfig.tarballFile(context)
         if (tarball.exists() && verifySha256(tarball)) return
         val tmp = File(tarball.parentFile, tarball.name + ".tmp")
-        val connection = openFollowingRedirects(URL(ProotConfig.tarballUrl(context)))
+        val connection = openFollowingRedirects(URL(ProotConfig.tarballUrl()))
         val total = connection.contentLengthLong
         FileOutputStream(tmp).use { out ->
             val buffer = ByteArray(64 * 1024)
@@ -128,7 +128,7 @@ class UbuntuInstaller(private val context: Context) {
             }
         }
         val hex = digest.digest().joinToString("") { "%02x".format(it) }
-        return hex == ProotConfig.tarballSha256(context)
+        return hex == ProotConfig.tarballSha256()
     }
 
     private fun extractRootfs(rootfs: File, onProgress: (InstallPhase) -> Unit) {

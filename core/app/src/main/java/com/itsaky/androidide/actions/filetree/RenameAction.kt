@@ -69,7 +69,7 @@ class RenameAction(context: Context, override val order: Int) :
       _ ->
       dialogInterface.dismiss()
       actionScope.launchAsyncWithProgress(
-          configureFlashbar = { builder, cancelChecker ->
+          configureFlashbar = { builder, _ ->
             builder.message(com.itsaky.androidide.resources.R.string.please_wait)
           },
           action = { _, _ ->

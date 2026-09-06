@@ -37,7 +37,6 @@
   <string name="msg_unsupported_device">You are using %1$s variant of AndroidIDE on a %2$s-only device. This configuration is not supported. Please install the %2$s variant of AndroidIDE.</string>
   <string name="title_clear_output">Clear output</string>
   <string name="build_output">Build output</string>
-  <string name="run">Run</string>
 
   <!-- Project -->
   <string name="create_project">Create project</string>
@@ -244,7 +243,6 @@
   <string name="idepref_group_debugging">Debugging</string>
   <string name="idepref_devOptions_dumpLogs_title">Dump logs</string>
   <string name="idepref_devOptions_dumpLogs_summary">Dump AndroidIDE logs to $HOME/.androidide/logs</string>
-  <string name="msg_emptyview_applogs">Run the debug variant of your application to view its logs here.</string>
   <string name="msg_emptyview_idelogs">Logs from the IDE are shown here.</string>
   <string name="msg_emptyview_diagnostics">Open a file to show its diagnostic results</string>
   <string name="msg_emptyview_buildoutput">"Build the application or run a task to see its build output here. "</string>
@@ -272,7 +270,6 @@
   <string name="onboarding_title_permissions">Permissions</string>
   <string name="onboarding_subtitle_permissions">AndroidIDE requires the following permissions</string>
   <string name="msg_grant_permissions">Please grant the permissions to continue.</string>
-  <string name="msg_no_internet">It seems you\'re offline. Check your internet connection.</string>
   <string name="msg_terminal_new_sessions_disabled">Cannot create session. New sessions are disabled!</string>
   <string name="title_install_location_error">Install location error</string>
   <string name="title_unsupported_user">Unsupported user</string>

@@ -84,10 +84,10 @@ object ProotConfig {
     private fun isArm64(): Boolean =
         android.os.Build.SUPPORTED_ABIS.firstOrNull()?.startsWith("arm64") == true
 
-    fun tarballUrl(context: Context): String =
+    fun tarballUrl(): String =
         if (isArm64()) TarballUrlArm64 else TarballUrlArm
 
-    fun tarballSha256(context: Context): String =
+    fun tarballSha256(): String =
         if (isArm64()) TarballSha256Arm64 else TarballSha256Arm
 
     fun tarballFile(context: Context): File = File(context.cacheDir, "ubuntu-rootfs.tar.gz")

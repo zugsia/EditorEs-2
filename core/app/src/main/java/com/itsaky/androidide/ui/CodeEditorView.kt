@@ -484,6 +484,7 @@ class CodeEditorView(
     EventBus.getDefault().unregister(this)
   }
 
+  @OptIn(ExperimentalCoroutinesApi::class)
   override fun close() {
     codeEditorScope.cancelIfActive("Cancellation was requested")
     _binding?.editor?.apply {
@@ -491,6 +492,6 @@ class CodeEditorView(
       release()
     }
 
-    readWriteContext.use { }
+    readWriteContext.close()
   }
 }
