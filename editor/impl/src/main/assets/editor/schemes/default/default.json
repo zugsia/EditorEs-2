@@ -63,10 +63,8 @@
   },
   "editor": "@editor.json",
   "languages": [
-    "@java.json",
     "@json.json",
     "@kotlin.json",
-    "@xml.json",
     "@log.json"
   ]
 }

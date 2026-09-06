@@ -98,8 +98,7 @@ object IDEColorSchemeProvider {
       scheme.darkVariant?.load()
       scheme
     } catch (err: Exception) {
-      log.error("An error occurred while loading color scheme '{}'", EditorPreferences.colorScheme,
-        err)
+      log.error("An error occurred while loading color scheme '{}'", scheme.key, err)
       null
     }
   }

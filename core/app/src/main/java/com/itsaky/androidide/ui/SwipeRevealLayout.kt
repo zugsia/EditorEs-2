@@ -62,12 +62,12 @@ open class SwipeRevealLayout @JvmOverloads constructor(
 
   private val dragHelperCallback = object : ViewDragHelper.Callback() {
     override fun tryCaptureView(child: View, pointerId: Int): Boolean {
-      return child === overlappingContent
+      return child === overlappingContent && dragHeightMax > 0
     }
 
     override fun onViewPositionChanged(changedView: View, left: Int, top: Int, dx: Int, dy: Int) {
       draggingViewTop = top
-      onDragProgress(min(1f, top.toFloat() / dragHeightMax.toFloat()))
+      onDragProgress(computeDragProgress(top))
     }
 
     override fun getViewVerticalDragRange(child: View): Int {
@@ -332,6 +332,18 @@ open class SwipeRevealLayout @JvmOverloads constructor(
     }
 
     smoothSlideTo(0f)
+  }
+
+  /**
+   * Computes the drag progress for the given top offset. A zero drag range (e.g. a `gone` hidden
+   * content) would otherwise yield NaN, which [View.setScaleX] rejects.
+   */
+  private fun computeDragProgress(top: Int): Float {
+    val range = dragHeightMax
+    if (range <= 0) {
+      return 0f
+    }
+    return min(1f, top.toFloat() / range.toFloat())
   }
 
   private fun smoothSlideTo(offset: Float) {
