@@ -53,6 +53,16 @@ jobs:
           mkdir -p config
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > config/release.keystore
           echo "RELEASE_KEYSTORE=${{ github.workspace }}/config/release.keystore" >> "$GITHUB_ENV"
+      - name: Create debug keystore
+        if: ${{ matrix.build_type == 'debug' }}
+        # AGP's validateSigningDebug fails on this JDK when it has to auto-generate the debug
+        # keystore, so create one up front and point the build at it via DEBUG_KEYSTORE.
+        run: |
+          mkdir -p config
+          keytool -genkey -v -keystore config/debug.keystore -alias androiddebugkey \
+            -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10950 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          echo "DEBUG_KEYSTORE=${{ github.workspace }}/config/debug.keystore" >> "$GITHUB_ENV"
       - name: Assemble ${{ matrix.build_type }} APK
         env:
           RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
