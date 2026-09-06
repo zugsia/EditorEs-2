@@ -56,8 +56,8 @@ Requirements: JDK 17, Android SDK (platform 34, build-tools 34.0.0) and NDK 26.1
 ```
 
 `.hoplite/setup.sh` installs everything above on a fresh Debian/Ubuntu machine. CI
-(`.github/workflows/build.yml`) builds signed release APKs for `arm64-v8a`, `armeabi-v7a` and
-`x86_64` on every push to `main`.
+(`.github/workflows/build.yml`) builds signed release APKs for `arm64-v8a` and `armeabi-v7a`
+on every push to `main`, and an unsigned debug APK for every pull request.
 
 ## Project layout
 
