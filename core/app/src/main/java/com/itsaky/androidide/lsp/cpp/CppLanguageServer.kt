@@ -21,6 +21,10 @@ import androidx.annotation.RestrictTo
 import com.itsaky.androidide.backend.build.ToolchainKind
 import com.itsaky.androidide.backend.build.ToolchainPaths
 import com.itsaky.androidide.backend.proot.ProotConfig
+import com.itsaky.androidide.editor.language.cpp.CppLanguage
+import com.itsaky.androidide.eventbus.events.editor.DocumentChangeEvent
+import com.itsaky.androidide.eventbus.events.editor.DocumentCloseEvent
+import com.itsaky.androidide.eventbus.events.editor.DocumentOpenEvent
 import com.itsaky.androidide.lsp.api.ILanguageClient
 import com.itsaky.androidide.lsp.api.ILanguageServer
 import com.itsaky.androidide.lsp.api.IServerSettings
@@ -38,14 +42,16 @@ import com.itsaky.androidide.lsp.models.ExpandSelectionParams
 import com.itsaky.androidide.lsp.models.FormatCodeParams
 import com.itsaky.androidide.lsp.models.InsertTextFormat
 import com.itsaky.androidide.lsp.models.LSPFailure
-import com.itsaky.androidide.lsp.models.MatchLevel
 import com.itsaky.androidide.lsp.models.ReferenceParams
 import com.itsaky.androidide.lsp.models.ReferenceResult
 import com.itsaky.androidide.lsp.models.SignatureHelp
 import com.itsaky.androidide.lsp.models.SignatureHelpParams
+import com.itsaky.androidide.lsp.models.SnippetDescription
+import com.itsaky.androidide.lsp.models.TextEdit
 import com.itsaky.androidide.models.Location
 import com.itsaky.androidide.models.Position
 import com.itsaky.androidide.models.Range
+import com.itsaky.androidide.preferences.internal.BackendPreferences
 import com.itsaky.androidide.projects.IWorkspace
 import java.io.File
 import java.net.URI
@@ -70,8 +76,10 @@ import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextDocumentItem
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
 import org.eclipse.lsp4j.launch.LSPLauncher
-
 import org.eclipse.lsp4j.services.LanguageServer
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
 import org.slf4j.LoggerFactory
 
 class CppLanguageServer(
@@ -85,16 +93,19 @@ class CppLanguageServer(
   override val serverId: String = SERVER_ID
 
   private val lock = Any()
+  private val syncLock = Any()
   private var process: Process? = null
   private var server: LanguageServer? = null
   private var root: File? = null
 
+  // keyed by normalized file path, not by URI: Java's File.toURI() yields "file:/x" while
+  // clangd replies with "file:///x", so raw URI strings never match
   private val diagnostics = ConcurrentHashMap<String, List<DiagnosticItem>>()
   private val versions = ConcurrentHashMap<String, AtomicInteger>()
   private val opened = ConcurrentHashMap.newKeySet<String>()
 
   companion object {
-    const val SERVER_ID = "ide.lsp.cpp"
+    const val SERVER_ID = CppLanguage.SERVER_ID
 
     private val log = LoggerFactory.getLogger(CppLanguageServer::class.java)
 
@@ -107,7 +118,7 @@ class CppLanguageServer(
       "--clang-tidy",
       "--all-scopes-completion",
       "--completion-style=detailed",
-      "--function-arg-placeholders",
+      "--function-arg-placeholders=true",
       "--header-insertion=iwyu",
       "--header-insertion-decorators",
       "--limit-results=100",
@@ -117,6 +128,31 @@ class CppLanguageServer(
 
     private const val REQUEST_TIMEOUT_SECONDS = 20L
     private const val DIAGNOSTICS_WAIT_MS = 3000L
+
+    private val CppExtensions = setOf("c", "h", "cc", "cpp", "cxx", "hpp", "hh", "hxx")
+
+    /**
+     * Compile flags clangd uses for files that are not covered by a compilation database (i.e.
+     * before the first CMake configure). Without a target and sysroot clangd falls back to the
+     * host defaults, cannot find any standard header, and completion degrades to identifier
+     * guesses from the current buffer.
+     */
+    private fun fallbackFlags(): List<String> {
+      val sysroot = "${ToolchainPaths.guestNdkBin().removeSuffix("/bin")}/sysroot"
+      val triple = when (BackendPreferences.abis().firstOrNull()) {
+        "armeabi-v7a" -> "armv7a-linux-androideabi"
+        else -> "aarch64-linux-android"
+      }
+      return listOf(
+        "--target=$triple${BackendPreferences.buildApiLevel}",
+        "--sysroot=$sysroot",
+        "-std=c++17"
+      )
+    }
+
+    private fun isCppFile(file: Path): Boolean {
+      return file.toFile().extension.lowercase() in CppExtensions
+    }
   }
 
   override fun shutdown() {
@@ -129,6 +165,10 @@ class CppLanguageServer(
       root = null
       opened.clear()
       versions.clear()
+      diagnostics.clear()
+    }
+    if (EventBus.getDefault().isRegistered(this)) {
+      EventBus.getDefault().unregister(this)
     }
   }
 
@@ -167,7 +207,8 @@ class CppLanguageServer(
         result.isLeft -> result.left ?: emptyList()
         else -> result.right?.items ?: emptyList()
       }
-      CompletionResult(items.map { mapCompletion(it) })
+      val prefix = params.prefix ?: ""
+      CompletionResult(items.map { mapCompletion(it, prefix) })
     } catch (error: Throwable) {
       log.error("clangd completion failed", error)
       CompletionResult.EMPTY
@@ -231,16 +272,64 @@ class CppLanguageServer(
     ensureStarted(rootFor(ioFile)) ?: return DiagnosticResult.NO_UPDATE
     return try {
       val uri = ioFile.toURI().toString()
+      val key = diagnosticsKey(uri)
       syncDocument(ioFile, uri, runCatching { ioFile.readText() }.getOrNull())
       val deadline = System.currentTimeMillis() + DIAGNOSTICS_WAIT_MS
-      while (!diagnostics.containsKey(uri) && System.currentTimeMillis() < deadline) {
+      while (!diagnostics.containsKey(key) && System.currentTimeMillis() < deadline) {
         kotlinx.coroutines.delay(150)
       }
-      DiagnosticResult(file, diagnostics[uri] ?: emptyList())
+      DiagnosticResult(file, diagnostics[key] ?: emptyList())
     } catch (error: Throwable) {
       log.error("clangd analyze failed", error)
       DiagnosticResult.NO_UPDATE
     }
+  }
+
+  /**
+   * Keeps clangd in sync with the editor buffer. The editor dispatches these on its own thread; the
+   * document is only forwarded when the server is already running so opening a file never blocks
+   * on a clangd start.
+   */
+  @Subscribe(threadMode = ThreadMode.ASYNC)
+  @Suppress("unused")
+  fun onDocumentOpen(event: DocumentOpenEvent) {
+    if (!isCppFile(event.openedFile)) {
+      return
+    }
+    val file = event.openedFile.toFile()
+    ensureStarted(rootFor(file)) ?: return
+    syncDocument(file, file.toURI().toString(), event.text)
+  }
+
+  @Subscribe(threadMode = ThreadMode.ASYNC)
+  @Suppress("unused")
+  fun onDocumentChange(event: DocumentChangeEvent) {
+    if (!isCppFile(event.changedFile)) {
+      return
+    }
+    val file = event.changedFile.toFile()
+    if (synchronized(lock) { server } == null) {
+      return
+    }
+    syncDocument(file, file.toURI().toString(), event.newText)
+  }
+
+  @Subscribe(threadMode = ThreadMode.ASYNC)
+  @Suppress("unused")
+  fun onDocumentClose(event: DocumentCloseEvent) {
+    if (!isCppFile(event.closedFile)) {
+      return
+    }
+    val uri = event.closedFile.toFile().toURI().toString()
+    val server = synchronized(lock) { server } ?: return
+    if (!opened.remove(uri)) {
+      return
+    }
+    versions.remove(uri)
+    diagnostics.remove(diagnosticsKey(uri))
+    runCatching {
+      server.textDocumentService.didClose(DidCloseTextDocumentParams(TextDocumentIdentifier(uri)))
+    }.onFailure { log.error("clangd didClose failed for $uri", it) }
   }
 
   override fun formatCode(params: FormatCodeParams?): CodeFormatResult {
@@ -306,10 +395,17 @@ class CppLanguageServer(
         val init = InitializeParams()
         init.rootUri = projectRoot.toURI().toString()
         init.processId = null
+        init.initializationOptions = mapOf(
+          "fallbackFlags" to fallbackFlags(),
+          "clangdFileStatus" to false
+        )
         remote.initialize(init).get(30, TimeUnit.SECONDS)
         remote.initialized(InitializedParams())
         root = projectRoot
         server = remote
+        if (!EventBus.getDefault().isRegistered(this)) {
+          EventBus.getDefault().register(this)
+        }
         remote
       } catch (error: Throwable) {
         log.error("Failed to start clangd", error)
@@ -324,25 +420,28 @@ class CppLanguageServer(
   private fun syncDocument(file: File, uri: String, content: CharSequence?) {
     val server = synchronized(lock) { this.server } ?: return
     val text = content?.toString() ?: runCatching { file.readText() }.getOrNull() ?: return
-    try {
-      if (opened.add(uri)) {
-        versions[uri] = AtomicInteger(1)
-        server.textDocumentService.didOpen(
-          DidOpenTextDocumentParams(TextDocumentItem(uri, "cpp", 1, text)))
-      } else {
-        val current = versions[uri]?.incrementAndGet() ?: 1
-        versions[uri] = AtomicInteger(current)
-        server.textDocumentService.didChange(
-          DidChangeTextDocumentParams(
-            VersionedTextDocumentIdentifier().apply { this.uri = uri; this.version = current },
-            listOf(TextDocumentContentChangeEvent(text))))
+    // completion requests and editor change events race here; document versions must stay ordered
+    synchronized(syncLock) {
+      try {
+        if (opened.add(uri)) {
+          versions[uri] = AtomicInteger(1)
+          server.textDocumentService.didOpen(
+            DidOpenTextDocumentParams(TextDocumentItem(uri, "cpp", 1, text)))
+        } else {
+          val current = versions[uri]?.incrementAndGet() ?: 1
+          versions[uri] = AtomicInteger(current)
+          server.textDocumentService.didChange(
+            DidChangeTextDocumentParams(
+              VersionedTextDocumentIdentifier().apply { this.uri = uri; this.version = current },
+              listOf(TextDocumentContentChangeEvent(text))))
+        }
+      } catch (error: Throwable) {
+        log.error("clangd sync failed for $uri", error)
       }
-    } catch (error: Throwable) {
-      log.error("clangd sync failed for $uri", error)
     }
   }
 
-  private fun mapCompletion(item: org.eclipse.lsp4j.CompletionItem): CompletionItem {
+  private fun mapCompletion(item: org.eclipse.lsp4j.CompletionItem, prefix: String): CompletionItem {
     val insertText = item.textEdit?.let { edit ->
       when {
         edit.isLeft -> edit.left?.newText
@@ -350,22 +449,47 @@ class CppLanguageServer(
         else -> null
       }
     } ?: item.insertText ?: item.label
+    // clangd prefixes labels with a header-insertion decorator (' ' or '•')
+    val label = (item.label ?: "").trimStart(' ', '•')
+    val isSnippet = item.insertTextFormat == org.eclipse.lsp4j.InsertTextFormat.Snippet
+    val matchCandidate = item.filterText ?: insertText ?: label
+    val additionalEdits = item.additionalTextEdits?.mapNotNull { mapTextEdit(it) }
     return CompletionItem(
-      item.label ?: "",
+      label,
       item.detail ?: "",
       insertText,
-      if (item.insertTextFormat == org.eclipse.lsp4j.InsertTextFormat.Snippet) {
-        InsertTextFormat.SNIPPET
-      } else {
-        InsertTextFormat.PLAIN_TEXT
-      },
+      if (isSnippet) InsertTextFormat.SNIPPET else InsertTextFormat.PLAIN_TEXT,
       item.sortText,
       null,
       mapKind(item.kind),
-      MatchLevel.NO_MATCH,
-      null,
+      CompletionItem.matchLevel(matchCandidate, prefix),
+      additionalEdits,
       null
+    ).also {
+      if (isSnippet) {
+        // DefaultEditHandler.insertSnippet requires this; it replaces the typed prefix
+        it.snippetDescription = SnippetDescription(prefix.length)
+      }
+    }
+  }
+
+  private fun mapTextEdit(edit: org.eclipse.lsp4j.TextEdit): TextEdit? {
+    val range = edit.range ?: return null
+    return TextEdit(
+      Range(
+        Position(range.start.line, range.start.character),
+        Position(range.end.line, range.end.character)
+      ),
+      edit.newText ?: ""
     )
+  }
+
+  private fun diagnosticsKey(uri: String): String {
+    return try {
+      Paths.get(URI(uri)).toAbsolutePath().normalize().toString()
+    } catch (error: Throwable) {
+      uri
+    }
   }
 
   private fun mapKind(kind: org.eclipse.lsp4j.CompletionItemKind?): CompletionItemKind {
@@ -424,7 +548,13 @@ class CppLanguageServer(
             }
           )
         }
-        this@CppLanguageServer.diagnostics[diagnostics.uri] = items
+        val key = diagnosticsKey(diagnostics.uri)
+        this@CppLanguageServer.diagnostics[key] = items
+        // clangd pushes diagnostics on its own after every didOpen/didChange; forward them to
+        // the IDE so the editor shows them without an explicit analyze() round trip
+        val client = this@CppLanguageServer.client ?: return
+        val path = runCatching { Paths.get(key) }.getOrNull() ?: return
+        client.publishDiagnostics(DiagnosticResult(path, items))
       } catch (error: Throwable) {
         log.error("Failed to map diagnostics", error)
       }

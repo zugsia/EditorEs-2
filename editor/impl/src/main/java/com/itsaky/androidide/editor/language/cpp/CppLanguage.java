@@ -16,17 +16,16 @@
  */
 package com.itsaky.androidide.editor.language.cpp;
 
-import android.os.Bundle;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.itsaky.androidide.editor.language.IDELanguage;
 import com.itsaky.androidide.editor.language.newline.BracketsNewlineHandler;
 import com.itsaky.androidide.editor.language.utils.CommonSymbolPairs;
 import com.itsaky.androidide.lexers.cpp.CPP14Lexer;
+import com.itsaky.androidide.lsp.api.ILanguageServer;
+import com.itsaky.androidide.lsp.api.ILanguageServerRegistry;
 import io.github.rosemoe.sora.lang.analysis.AnalyzeManager;
-import io.github.rosemoe.sora.lang.completion.CompletionCancelledException;
-import io.github.rosemoe.sora.lang.completion.CompletionPublisher;
 import io.github.rosemoe.sora.lang.smartEnter.NewlineHandler;
-import io.github.rosemoe.sora.text.CharPosition;
 import io.github.rosemoe.sora.text.ContentReference;
 import io.github.rosemoe.sora.widget.SymbolPairMatch;
 import java.io.StringReader;
@@ -36,6 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class CppLanguage extends IDELanguage {
+
+  /** Server ID of the C/C++ language server; must match {@code CppLanguageServer.SERVER_ID}. */
+  public static final String SERVER_ID = "ide.lsp.cpp";
 
   private static final Logger LOG = LoggerFactory.getLogger(CppLanguage.class);
   private final NewlineHandler[] newlineHandlers =
@@ -47,6 +49,18 @@ public class CppLanguage extends IDELanguage {
     analyzer = new CppAnalyzer();
   }
 
+  @Nullable
+  @Override
+  protected ILanguageServer getLanguageServer() {
+    return ILanguageServerRegistry.getDefault().getServer(SERVER_ID);
+  }
+
+  @Override
+  protected boolean checkIsCompletionChar(char c) {
+    // only the identifier tail is the prefix; clangd itself handles the '.', '->' and '::' context
+    return Character.isJavaIdentifierPart(c);
+  }
+
   @NonNull
   @Override
   public AnalyzeManager getAnalyzeManager() {
@@ -56,17 +70,6 @@ public class CppLanguage extends IDELanguage {
   @Override
   public int getInterruptionLevel() {
     return INTERRUPTION_LEVEL_STRONG;
-  }
-
-  @Override
-  public void requireAutoComplete(
-      @NonNull ContentReference content,
-      @NonNull CharPosition position,
-      @NonNull CompletionPublisher publisher,
-      @NonNull Bundle extraArguments)
-      throws CompletionCancelledException {
-
-    //  completer.complete(content, position, publisher, extraArguments);
   }
 
   @Override
